@@ -1,0 +1,568 @@
+This has my chat log with CHAT GPT where i ask it if my program meets the requirements. I then took its feedback and incorparated into this variation of my code. Here is the chat: I have a final project for my comp sci class. It is pretty important and I need you to check that I have all the requirements. Here are the requirements: At least 7 routes.
+At least 5 Pages, or 10 FragmentsLinks to an external site., or a combination thereof.
+The implementation of the State dataclass must have at least 4 fields.
+At least one field must be a list of class instances or a dictionary of class instances.
+This means that there must be a second dataclass.
+At least 4 state fields, including the list or dictionary of class instances, must each be meaningfully modified in at least one route; those 4 state fields cannot be constants.
+At least 3 input fields (TextBox, CheckBox, SelectBox, TextArea). They don't have to be the same type.
+At least 3 meaningful if statements.
+At least 1 loop that iterates over an attribute of the list of class instances or dictionary of class instances in a meaningful way.
+The site should have a legitimate purpose or functionality.
+No global variables (global constantsLinks to an external site. are fine).
+You must use the Drafter library.
+Any advanced coding techniques (i.e. that weren't covered in this course) used are thoroughly documented in the code. Ok, there are the requirements. Now I need you to look over my code and provide the feedback needed. Here is my code: 
+from drafter import *
+from dataclasses import dataclass
+from datetime import datetime
+from bakery import assert_equal
+
+#The event dataclass will store the information for a single event.
+@dataclass
+class Event:
+    date: str
+    title: str
+    description: str
+
+
+#This will store information about the entire website
+@dataclass
+class State:
+    events: list
+    message: str
+
+
+#This will be the front page of the website. It will essentially be the hub for everything that goes on.
+@route
+def index(state: State) -> Page:
+    return Page(state, [
+        Header("Calendar"),
+        "This is your personal calendar!",
+        "Keep track of assignments, meetings, and other events.",
+        HorizontalRule(),
+
+        Header("Calendar Menu", 2),
+
+        Button("Add an Event", "add_page"),
+        Button("View All Events", "view_all"),
+        Button("View Events on a Specific Day", "day_page"),
+        Button("Search for an Event", "search_page"),
+        Button("Delete an Event", "delete_page"),
+
+        HorizontalRule(),
+        "Total Events: " + str(len(state.events)),
+        state.message
+    ])
+
+
+#this is the page that adds an event. it will ask about when the date should be
+@route
+def add_page(state: State) -> Page:
+    return Page(state, [
+        Header("Add a Event"),
+
+        "Enter the date (YYYY-MM-DD):",
+        TextBox("event_date"),
+
+        "Enter the title of that event:",
+        TextBox("event_title"),
+
+        "Enter the description:",
+        TextArea("event_description"),
+
+        Button("Add Event", "add_event"),
+        Button("Return Home", "index")
+    ])
+
+
+#this function will add an event and store it in the general page state.
+@route
+def add_event(state: State, event_date: str,
+              event_title: str,
+              event_description: str) -> Page:
+
+    #I have tooken computer science classes in highschool and I do not think we have covered try and except but basically try runs a code and then if an error occurs it will run the except
+    try:
+        datetime.strptime(event_date, "%Y-%m-%d")
+
+    except ValueError:
+        state.message = "Please enter a valid date using YYYY-MM-DD."
+        return add_page(state)
+
+    if event_title.strip() == "":
+        state.message = "Please enter an event title."
+        return add_page(state)
+
+    new_event = Event(
+        event_date,
+        event_title,
+        event_description
+    )
+
+    found = False
+    i = 0
+
+
+#This while loop effectively checks if an event already exists. This does not seem neccesary but I ran into some issues with finding and event so I added this in
+    while i < len(state.events):
+
+        if (state.events[i].date == event_date and
+                state.events[i].title.lower() ==
+                event_title.lower()):
+
+            state.events[i] = new_event
+            found = True
+
+        i = i + 1
+
+    if found == False:
+        state.events.append(new_event)
+
+    state.message = "Event added successfully!"
+
+    return index(state)
+
+
+#this is the page to view all the events
+@route
+def view_all(state: State) -> Page:
+
+    contents = [
+        Header("All Calendar Events")
+    ]
+
+    if len(state.events) == 0:
+        contents.append("There is not events yet. You should add one!")
+
+    else:
+        for event in state.events:
+            contents.append(HorizontalRule())
+            contents.append("Date: " + event.date)
+            contents.append("Title: " + event.title)
+            contents.append("Description: " + event.description)
+
+    contents.append(HorizontalRule())
+    contents.append(Button("Return Home", "index"))
+
+    return Page(state, contents)
+
+
+#this is the page to view a specific event
+@route
+def day_page(state: State) -> Page:
+    return Page(state, [
+        Header("View Events by Date"),
+        "Enter the day you want to view (YYYY-MM-DD):",
+        TextBox("selected_date"),
+        Button("Find Events", "view_day"),
+        Button("Return Home", "index")
+    ])
+
+
+#view day will let you see a selected day
+@route
+def view_day(state: State, selected_date: str) -> Page:
+
+    contents = [
+        Header("Events for " + selected_date)
+    ]
+
+    found = False
+    for event in state.events:
+
+        if event.date == selected_date:
+            contents.append(HorizontalRule())
+            contents.append("Title: " + event.title)
+            contents.append("Description: " + event.description)
+            found = True
+
+    if found == False:
+        contents.append("No events found for this day.")
+
+    contents.append(Button("Return Home", "index"))
+
+    return Page(state, contents)
+
+
+#this function will search for an event 
+@route
+def search_page(state: State) -> Page:
+    return Page(state, [
+        Header("Search Events"),
+        "Enter a word or phrase from an event title:",
+        TextBox("search_text"),
+        Button("Search", "search_event"),
+        Button("Return Home", "index")
+    ])
+
+
+#this function will search for an event by asking for the day that it is wanted
+@route
+def search_event(state: State, search_text: str) -> Page:
+
+    contents = [
+        Header("Search Results")
+    ]
+
+    found = False
+
+    for event in state.events:
+
+        if search_text.lower() in event.title.lower():
+            contents.append(HorizontalRule())
+            contents.append("Title: " + event.title)
+            contents.append("Date: " + event.date)
+            contents.append("Description: " + event.description)
+            found = True
+
+    if found == False:
+        contents.append("No matching events were found.")
+
+    contents.append(Button("Return Home", "index"))
+
+    return Page(state, contents)
+
+
+#this function will use a page and delete an event 
+@route
+def delete_page(state: State) -> Page:
+
+    contents = [
+        Header("Delete an Event")
+    ]
+
+    if len(state.events) == 0:
+        contents.append("There are no events to delete.")
+
+    else:
+        contents.append("Enter the exact event title:")
+        contents.append(TextBox("delete_title"))
+
+        contents.append("Enter the event date (YYYY-MM-DD):")
+        contents.append(TextBox("delete_date"))
+
+        contents.append(Button("Delete Event", "delete_event"))
+
+    contents.append(Button("Return Home", "index"))
+
+    return Page(state, contents)
+
+
+#this function will delete an event individually
+@route
+def delete_event(state: State, delete_title: str,
+                 delete_date: str) -> Page:
+
+    found = False
+    i = 0
+
+    # Search through the events to find the one to delete
+    while i < len(state.events):
+
+        if (state.events[i].title.lower() ==
+                delete_title.lower() and
+                state.events[i].date == delete_date):
+
+            state.events.pop(i)
+            found = True
+            break
+
+        i = i + 1
+
+    if found == True:
+        state.message = "Event deleted successfully!"
+
+    else:
+        state.message = "Event could not be found."
+
+    return index(state)
+
+
+#this is the final code that will start the website
+start_server(
+    State([], "Welcome to your calendar!"),
+    site_title="My Calendar"
+) 
+
+Computer Science Final Project – Requirements Check
+I've reviewed your calendar application against all 12 requirements. Your program already has a strong foundation, but there are two major requirements that you currently do not meet and one that needs additional documentation.
+1. At least 7 routes
+Meets requirement
+You currently have 10 routes:
+index()
+add_page()
+add_event()
+view_all()
+day_page()
+view_day()
+search_page()
+search_event()
+delete_page()
+delete_event()
+You exceed the requirement by three routes.
+2. At least 5 Pages or 10 Fragments
+Meets requirement
+Your application contains several different pages, including:
+Homepage
+Add Event page
+View All Events page
+View Events by Date page
+Search Events page
+Delete Event page
+You comfortably satisfy this requirement.
+3. State dataclass must have at least 4 fields
+Does not meet requirement
+Your current State dataclass contains:
+python
+@dataclass
+class State:
+    events: list
+    message: str
+You currently have only two fields, whereas the requirement asks for at least four.
+I recommend adding two additional fields:
+python
+search_history: list
+selected_date: str
+These would allow your website to store previous searches and remember the date selected by the user.
+4. At least one field must be a list or dictionary of class instances
+Meets requirement
+You have already implemented this correctly.
+Your Event dataclass stores three attributes:
+python
+@dataclass
+class Event:
+    date: str
+    title: str
+    description: str
+Your State dataclass contains:
+python
+events: list
+This list stores Event instances, satisfying the requirement for a list of class instances and a second dataclass.
+5. At least 4 State fields must be meaningfully modified in routes
+Does not meet requirement
+Currently, you only have two State fields:
+events
+message
+Both are meaningfully modified throughout your program.
+For example:
+python
+state.events.append(new_event)
+This adds a new event to the calendar.
+python
+state.message = "Event added successfully!"
+This updates the website's message.
+However, you need four meaningfully modified State fields.
+I recommend implementing the following:
+search_history: Stores previous searches.
+selected_date: Stores the date selected by the user.
+You can meaningfully modify these fields using:
+python
+state.search_history.append(search_text)
+And:
+python
+state.selected_date = selected_date
+This would give you four State fields that are meaningfully modified in your routes.
+6. At least 3 input fields
+Meets requirement
+You have seven input fields:
+TextBox("event_date")
+TextBox("event_title")
+TextArea("event_description")
+TextBox("selected_date")
+TextBox("search_text")
+TextBox("delete_title")
+TextBox("delete_date")
+You exceed the requirement.
+7. At least 3 meaningful if statements
+Meets requirement
+You have numerous meaningful conditional statements.
+For example:
+python
+if event_title.strip() == "":
+Checks whether the user entered an empty event title.
+python
+if len(state.events) == 0:
+Checks whether there are any events in the calendar.
+python
+if event.date == selected_date:
+Checks whether an event matches the date entered by the user.
+You also check whether events already exist, whether searches produce results, and whether an event can be deleted.
+You comfortably meet this requirement.
+8. At least 1 meaningful loop
+Meets requirement
+You have both for and while loops.
+For example:
+python
+for event in state.events:
+This iterates through the Event instances stored in your events list.
+You use this loop to display all events, find events on a specific date, and search for events by title.
+You also use a while loop to check whether an event already exists before adding it.
+This requirement is satisfied.
+9. The site must have a legitimate purpose
+Meets requirement
+Your website is a personal calendar application.
+It allows users to:
+Add events.
+View all calendar events.
+Search for events.
+Find events on specific dates.
+Delete events.
+Your website has a clear and practical purpose.
+10. No global variables
+Meets requirement
+You do not declare any manually created global variables.
+Your program uses dataclasses and passes the State object between routes to manage information.
+This satisfies the requirement.
+11. Must use the Drafter library
+Meets requirement
+You correctly import Drafter:
+python
+from drafter import *
+You also use its features throughout your application, including:
+@route
+Page()
+Header()
+Button()
+TextBox()
+TextArea()
+HorizontalRule()
+start_server()
+This requirement is satisfied.
+12. Advanced coding techniques must be thoroughly documented
+Partially meets requirement
+You have already included comments explaining some of your coding techniques.
+For example, you explain your use of try and except and describe how your while loop works.
+However, I recommend improving these comments to explain exactly why you chose these techniques and how they help your program.
+For example, you could explain that try and except prevent invalid dates from being accepted and allow the program to display an error message instead of crashing.
+Final requirements summary
+Requirement
+Result
+At least 7 routes
+Pass
+At least 5 Pages
+Pass
+At least 4 State fields
+Fail
+Second dataclass and list of instances
+Pass
+4 meaningfully modified State fields
+Fail
+At least 3 input fields
+Pass
+At least 3 meaningful if statements
+Pass
+At least 1 meaningful loop
+Pass
+Legitimate purpose
+Pass
+No global variables
+Pass
+Drafter library
+Pass
+Documented advanced techniques
+Partial
+
+My final recommendations
+There are three main improvements I would make:
+1. Expand the State dataclass: Add search_history and selected_date so that your program has four State fields.
+2. Implement search history: Create a feature that records previous searches and allows users to view them.
+3. Store the selected date: Modify the date-viewing function so that the selected date is saved in the State object.
+You should also improve your comments explaining advanced coding techniques.
+Overall assessment: Your calendar application already satisfies most of the project requirements. The main area requiring improvement is the State dataclass and demonstrating that all four fields are meaningfully modified within your routes.
+What is the code needed to add these features? 
+Absolutely. Here are the exact code additions and modifications needed to address the missing State requirements and add search history functionality.
+
+1. Updated State dataclass
+Replace your original State dataclass with:
+
+
+python
+@dataclass
+class State:
+    events: list
+    message: str
+    search_history: list
+    selected_date: str
+2. Add a Search History button to the homepage
+Add this button inside your index() function:
+
+
+python
+Button("View Search History", "view_history"),
+3. Add the new view_history() route
+Add this entire function after your index() function:
+
+
+python
+@route
+def view_history(state: State) -> Page:
+    contents = [
+        Header("Previous Searches")
+    ]
+
+    if len(state.search_history) == 0:
+        contents.append("You have not searched for anything yet.")
+    else:
+        for search in state.search_history:
+            contents.append(search)
+
+    contents.append(Button("Return Home", "index"))
+
+    return Page(state, contents)
+This allows users to view their previous searches.
+
+4. Modify view_day()
+Add this line immediately after the function definition:
+
+
+python
+state.selected_date = selected_date
+Your function should begin like this:
+
+
+python
+@route
+def view_day(state: State, selected_date: str) -> Page:
+    state.selected_date = selected_date
+
+    contents = [
+        Header("Events for " + selected_date)
+    ]
+This stores the date selected by the user.
+
+5. Modify search_event()
+Add this line immediately after the function definition:
+
+
+python
+state.search_history.append(search_text)
+Your function should begin like this:
+
+
+python
+@route
+def search_event(state: State, search_text: str) -> Page:
+    state.search_history.append(search_text)
+
+    contents = [
+        Header("Search Results")
+    ]
+This records each search in the search history list.
+
+6. Update start_server()
+Replace your original initialization with:
+
+
+python
+start_server(
+    State([], "Welcome to your calendar!", [], ""),
+    site_title="My Calendar"
+)
+This initializes all four State fields.
+
+That's all the necessary additions for these changes. Your existing event-adding, viewing, searching, and deletion functionality can remain in place.
+
+One important note: make sure you test the updated application and can explain each addition yourself, particularly how the new State attributes are modified.
+
+
+
+
